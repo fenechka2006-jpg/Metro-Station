@@ -1,0 +1,267 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <list>
+#include <cassert>
+#include <clocale>
+
+class Station {
+protected:
+    int orderNumber{ 0 };
+    std::string name{ "" };
+    double passengerFlow{ 0.0 };
+
+public:
+    Station() : orderNumber(0), name(""), passengerFlow(0.0) {}
+
+    Station(int orderNumber, std::string name, double passengerFlow) {
+        if (!setOrderNumber(orderNumber)) {
+            std::cout << "Некорректный номер" << std::endl;
+        }
+        if (!setName(name)) {
+            std::cout << "Некорректное название" << std::endl;
+        }
+        if (!updatePassengerFlow(passengerFlow)) {
+            std::cout << "Некорректный пассажиропоток" << std::endl;
+        }
+    }
+
+    virtual ~Station() = default; // виртуальный дефолтный деструктор 
+
+    bool setOrderNumber(int new_number) {
+        if (new_number < 1) {
+            std::cout << "Номер станции должен быть >= 1" << std::endl;
+            return false;
+        }
+        orderNumber = new_number;
+        return true;
+    }
+
+    bool setName(std::string new_name) {
+        if (new_name.empty()) {
+            std::cout << "Название станции не может быть пустым" << std::endl;
+            return false;
+        }
+        name = new_name;
+        return true;
+    }
+
+    bool updatePassengerFlow(double new_flow) {
+        if (new_flow < 0) {
+            std::cout << "Пассажиропоток не может быть отрицательным" << std::endl;
+            return false;
+        }
+        double oldFlow = passengerFlow;
+        passengerFlow = new_flow;
+        std::cout << "Станция '" << name << "': пассажиропоток изменён с "
+            << oldFlow << " до " << new_flow << " чел/день" << std::endl;
+        return true;
+    }
+
+    int getOrderNumber() const { return orderNumber; }
+    std::string getName() const { return name; }
+    double getPassengerFlow() const { return passengerFlow; }
+
+    bool operator<(const Station& other) const { return orderNumber < other.orderNumber; }
+    bool operator==(const Station& other) const { return orderNumber == other.orderNumber; }
+};
+
+// пересадка
+class Transfer {
+private:
+    Station* station1{ nullptr };
+    Station* station2{ nullptr };
+    int transferTime{ 0 };
+    double passengerFlow{ 0.0 };
+
+public:
+    Transfer() = default;
+
+    Transfer(Station* s1, Station* s2, int time, double flow) {
+        station1 = s1;
+        station2 = s2;
+        if (time > 0) transferTime = time;
+        if (flow >= 0) passengerFlow = flow;
+    }
+
+    Station* getStation1() const { return station1; }
+    Station* getStation2() const { return station2; }
+    int getTransferTime() const { return transferTime; }
+    double getPassengerFlow() const { return passengerFlow; }
+};
+
+//станция пересадки
+class TransferStation : public Station {
+protected:
+    std::vector<std::string> transferLines;
+
+public:
+    TransferStation() : Station() {}
+
+    TransferStation(int orderNumber, std::string name, double passengerFlow, std::vector<std::string> lines)
+        : Station(orderNumber, name, passengerFlow), transferLines(lines) {}
+
+    void addTransferLine(const std::string& lineName) {
+        transferLines.push_back(lineName);
+    }
+
+    std::vector<std::string> getTransferLines() const {
+        return transferLines;
+    }
+};
+
+// линия
+class Line {
+private:
+    std::string lineName;
+    std::list<Station*> stations;
+    bool isRing{ false };
+
+public:
+    Line() : lineName("") {}
+
+    Line(std::string name, bool ring) : lineName(name), isRing(ring) {}
+
+    void addStation(Station* st) {
+        stations.push_back(st);
+    }
+
+    std::string getLineName() const { return lineName; }
+    bool getIsRing() const { return isRing; }
+    std::list<Station*> getStations() const { return stations; }
+};
+
+// кроссплатформенная станция
+class CrossPlatformStation : public TransferStation {
+protected:
+    std::vector<int> stationNumbers; 
+
+public:
+    CrossPlatformStation() : TransferStation() {}
+
+    CrossPlatformStation(int orderNumber, std::string name, double passengerFlow,
+        std::vector<std::string> lines, std::vector<int> numbers)
+        : TransferStation(orderNumber, name, passengerFlow, lines), stationNumbers(numbers) {}
+
+    void addStationNumber(int num) {
+        stationNumbers.push_back(num);
+    }
+
+    std::vector<int> getStationNumbers() const {
+        return stationNumbers;
+    }
+};
+
+
+class TrackSegment {
+private:
+    Station* station1{ nullptr };
+    Station* station2{ nullptr };
+    int travelTime{ 0 }; 
+
+public:
+    TrackSegment() = default;
+
+    TrackSegment(Station* s1, Station* s2, int time) {
+        if (s1 == nullptr || s2 == nullptr) {
+            std::cout << "Перегон должен связывать две станции" << std::endl;
+        }
+        else {
+            station1 = s1;
+            station2 = s2;
+        }
+        if (time <= 0) {
+            std::cout << "Время прохождения перегона должно быть положительным" << std::endl;
+        }
+        else {
+            travelTime = time;
+        }
+    }
+
+    Station* getStation1() const { return station1; }
+    Station* getStation2() const { return station2; }
+    int getTravelTime() const { return travelTime; }
+};
+
+
+class Metro {
+private:
+    std::vector<Line*> lines;
+
+public:
+    Metro() = default;
+
+    ~Metro() {
+        for (auto line : lines) {
+            delete line;
+        }
+    }
+
+    void addLine(Line* line) {
+        if (line != nullptr) {
+            lines.push_back(line);
+        }
+    }
+
+    void printMetroInfo() const {
+        std::cout << "Схема метрополитена" << std::endl;
+        for (auto line : lines) {
+            std::cout << "Линия: " << line->getLineName();
+            if (line->getIsRing()) std::cout << " (кольцевая)";
+            std::cout << std::endl;
+
+            for (auto station : line->getStations()) {
+                std::cout << "  - Станция: " << station->getName()
+                    << " (Номер: " << station->getOrderNumber() << ")" << std::endl;
+            }
+        }
+    }
+
+    std::vector<Line*> getLines() const {
+        return lines;
+    }
+};
+
+int main() {
+    setlocale(LC_ALL, "Russian");
+
+    // 1. Тест валидации (проверяем, что сеттеры не дают ввести мусор)
+    Station st1(1, "Лубянка", 1000);
+    assert(st1.setOrderNumber(-5) == false); // Отрицательный номер запрещен
+    assert(st1.setName("") == false);        // Пустое имя запрещено
+    assert(st1.getOrderNumber() == 1);       // Номер не изменился
+
+    // 2. Тест наследования и полиморфизма
+    // Создаем разные типы станций и суем их в один указатель базового класса
+    Station* normal = new Station(2, "Обычная", 500);
+    Station* transfer = new TransferStation(3, "Пересадочная", 800, { "Красная" });
+    Station* cross = new CrossPlatformStation(4, "Кросс", 300, { "Синяя" }, { 10 });
+
+    Line* myLine = new Line("Сокольническая", false);
+    myLine->addStation(normal);
+    myLine->addStation(transfer);
+    myLine->addStation(cross);
+
+    // Проверяем, что все 3 станции легли в контейнер
+    assert(myLine->getStations().size() == 3);
+
+    // 3. Тест контейнера Метро
+    Metro* metro = new Metro();
+    metro->addLine(myLine);
+    assert(metro->getLines().size() == 1);
+
+    // Выводим инфу (проверка требования "вывод в человекочитаемом виде")
+    metro->printMetroInfo();
+
+    // 4. Очистка памяти (проверка деструктора Metro)
+    delete metro; // Удалит myLine благодаря вашему деструктору
+
+    // Станции удаляем вручную, так как мы их создавали через new, 
+    // а Метро ими не владеет.
+    delete normal;
+    delete transfer;
+    delete cross;
+
+    std::cout << "Все тесты успешно пройдены!" << std::endl;
+    return 0;
+}
